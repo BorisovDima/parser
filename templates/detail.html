@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+
+{% block body %}
+<div class="card">
+  <div class="card-body" >
+      <p>{{ article.date }}</p>
+    <h1>{{ article.title }}</h1>
+      <h3>{{ article.subtitle }}</h3>
+     {{ article.get_text() |safe }}
+      <img src="{{ article.image }}" class="img-fluid">
+  </div>
+</div>
+
+
+
+{% endblock %}

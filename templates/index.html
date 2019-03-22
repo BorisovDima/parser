@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+
+
+
+{% block body %}
+
+<form method="POST">
+    <input class="btn btn-danger" type="submit" value="Parse">
+</form>
+
+{% for article in articles %}
+    <div class="card">
+        <div class="card-body">
+            <p>{{ article.date }}</p>
+            <h1>{{ article.title }}</h1>
+            <p>{{ article.get_text(300) + '...'}}</p>
+            <a class="btn btn-danger" href="detail/{{ article.id }}" >
+                Подробнее
+            </a>
+        </div>
+    </div>
+{% endfor %}
+
+{% endblock %}
+
