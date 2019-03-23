@@ -1,0 +1,13 @@
+<button class="btn btn-danger" data-id="parse-articles"> Parse </button>
+{% for article in articles %}
+    <div class="card">
+        <div class="card-body">
+            <p>{{ article.date }}</p>
+            <h1>{{ article.title }}</h1>
+            <p>{{ (article.get_text(300) + '...') |safe }}</p>
+            <a class="btn btn-danger" href="detail/{{ article.id }}" >
+               Read more
+            </a>
+        </div>
+    </div>
+{% endfor %}

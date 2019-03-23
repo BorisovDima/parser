@@ -1,10 +1,11 @@
 from lxml import html
 import requests
 from datetime import datetime
-
+import re
 
 class Parser:
     url = 'https://www.rbc.ru'
+    text_filter_pattern = re.compile(r'')
 
     def parse_article(self, link):
         response = requests.get(link)
@@ -19,11 +20,20 @@ class Parser:
         for el in page.xpath('.//div[contains(@class, "article__text")]//p | '
                              './/div[contains(@class, "article__text")]//ul '):
             try:
+                self.filter_text(el)
                 el_data = html.etree.tostring(el,  method='html', encoding='utf-8').decode('utf-8')
-            except Exception:
+            except Exception as err:
                 continue
             article += el_data
-        return title, subtitle, image, article, self.format_date(date)
+        return title, subtitle, article, self.format_date(date), image
+
+    def filter_text(self, text):
+        """
+        Delete all links
+        """
+        for link in text.xpath('.//a'):
+            link.tail = (link.text or '') + (link.tail or '')
+        html.etree.strip_elements(text, 'a', with_tail=False)
 
 
     def format_date(self, string):

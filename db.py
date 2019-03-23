@@ -1,7 +1,19 @@
 import sqlite3
+from contextlib import contextmanager
 import os
 
+from flask import current_app
+
 class Article:
+    """
+    Object relational mapping our table
+    """
+
+    # Available sql commands
+    create = 'INSERT INTO articles(title, subtitle, article, date, image) values (?, ?, ?, ?, ?)'
+    get_id = 'SELECT * FROM articles WHERE id=?'
+    get_many = 'SELECT * FROM articles'
+    delete_many = 'DELETE FROM articles'
 
     def __init__(self, title, subtitle, article, date, image, id):
         self.title = title
@@ -15,56 +27,83 @@ class Article:
         return self.article if not length else self.article[:length - len(self.title)]
 
 
-
 class Database:
-    db_name = os.environ.get('DB_NAME') or 'database'
 
-    def init(self):
-        self.conn = sqlite3.connect(self.db_name)
+    def __init__(self, app):
+        self.app = app
+
+    @contextmanager
+    def init_db(self):
+        """
+        Create connection and cursor
+
+        with obj.init_db():
+            do something with db
+        """
+        self.conn = sqlite3.connect(self.app.config['DB_NAME'])
         self.c = self.conn.cursor()
-        self.db = self
+        try:
+            yield
+        finally:
+            self.conn.close()
 
+    def delete_db(self):
+        # assert os.path.exists(app.config['DB_NAME'])
+        os.remove(self.app.config['DB_NAME'])
 
-class DatabaseMixin(Database):
-
-    def __init__(self):
-        self.init()
-        self.crete_table()
-        super().__init__()
-
-    def clear_db(self):
-        self.c.execute('DELETE FROM articles')
-        self.conn.commit()
-
-    def drop_table(self):
-        self.c.execute('DROP TABLE IF EXISTS articles')
-
-    def crete_table(self):
-        self.c.execute("CREATE TABLE IF NOT EXISTS articles "
-                  "(title TEXT NOT NULL, "
-                   "subtitle TEXT , "
-                  "article TEXT NOT NULL, "
-                  "date DATETIME NOT NULL, "
-                  "image VARCHAR(244), "
-                  "id INTEGER PRIMARY KEY AUTOINCREMENT)")
-
-
-    def create_article(self, title, subtitle, image, article, date):
-        self.c.execute('INSERT INTO articles(title, subtitle, article, date, image) values (?, ?, ?, ?, ?)',
-                                                                (title, subtitle, article, date, image))
-        self.conn.commit()
+    def crete_tables(self):
+        with self.init_db():
+            self.c.execute("CREATE TABLE IF NOT EXISTS articles "
+                      "(title TEXT NOT NULL, "
+                       "subtitle TEXT , "
+                      "article TEXT NOT NULL, "
+                      "date DATETIME NOT NULL, "
+                      "image VARCHAR(244), "
+                      "id INTEGER PRIMARY KEY AUTOINCREMENT)")
+            self.conn.commit()
 
 
 
-    def get_articles(self):
-        return [self.get_obj(*q) for q in self.c.execute('SELECT * FROM articles')]
+class DatabaseMixin:
+    Table = None
 
-    def get_article(self, id):
-        data = self.c.execute('SELECT * FROM articles WHERE id=?', (str(id), )).fetchone()
-        return self.get_obj(*data) if data else None
+    def dispatch_request(self, *args, **kwargs):
+        """
+        Start request. Only Class-Based-Views
+        """
+        assert self.Table is not None
+        self.db = Database(current_app)
+        with self.db.init_db():
+            return super().dispatch_request(*args, **kwargs)
 
-    @property
-    def get_obj(self):
-        return Article
+    def create(self, *args):
+        """
+        Create row in table
+        """
+        self.db.c.execute(self.Table.create, args)
+        self.db.conn.commit()
+        current_app.logger.info('Article create')
+        return self.Table(*args, id=self.db.c.lastrowid)
+
+    def delete_many(self):
+        """
+        Delete all row in table
+        """
+        self.db.c.execute(self.Table.delete_many)
+        self.db.conn.commit()
+        current_app.logger.info('Articles deleted')
+
+    def get_many(self):
+        """
+        Get all row in table
+        """
+        return [self.Table(*q) for q in self.db.c.execute(self.Table.get_many)]
+
+    def get_id(self, id):
+        """
+        Search by id
+        """
+        data = self.db.c.execute(self.Table.get_id, (str(id),)).fetchone()
+        return self.Table(*data) if data else None
 
 
